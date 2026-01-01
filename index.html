@@ -2,15 +2,16 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>รักจิน - Mobile Version</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>รักจิน - Blue Heart Effect</title>
     <style>
-        /* ตั้งค่าพื้นฐานสำหรับมือถือ */
+        /* ตั้งค่าพื้นฐาน */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             font-family: 'Kanit', sans-serif;
+            -webkit-tap-highlight-color: transparent; /* ลบสีฟ้าตอนกดบนมือถือ */
         }
 
         body {
@@ -19,74 +20,106 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            background: #ffafbd;
-            background: linear-gradient(180deg, #ffafbd 0%, #ffc3a0 100%); /* ไล่สีแนวตั้ง */
+            background: linear-gradient(180deg, #ffafbd 0%, #ffc3a0 100%);
             overflow: hidden;
             position: relative;
+            touch-action: none; /* ป้องกันการเลื่อนจอไปมาขณะจิ้ม */
         }
 
-        /* กราฟิกพื้นหลัง ปรับตำแหน่งให้เหมาะกับแนวตั้ง */
+        /* กราฟิกพื้นหลัง */
         .circle {
             position: absolute;
-            background: rgba(255, 255, 255, 0.35);
+            background: rgba(255, 255, 255, 0.3);
             border-radius: 50%;
             filter: blur(40px);
             z-index: 1;
         }
-
         .circle-1 { width: 60vw; height: 60vw; top: 10%; right: -10%; background: #ff9a9e; }
         .circle-2 { width: 80vw; height: 80vw; bottom: 5%; left: -20%; background: #fad0c4; }
-        .circle-3 { width: 40vw; height: 40vw; top: 40%; left: 10%; background: #ffd1ff; opacity: 0.5; }
 
-        /* กล่องข้อความออกแบบมาเพื่อจอแนวตั้ง */
+        /* กล่องข้อความ */
         .container {
             position: relative;
             z-index: 2;
             text-align: center;
-            width: 85%; /* กว้างเกือบเต็มจอเล็กน้อย */
+            width: 80%;
             padding: 50px 20px;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(15px);
             -webkit-backdrop-filter: blur(15px);
             border-radius: 30px;
             border: 1px solid rgba(255, 255, 255, 0.4);
-            box-shadow: 0 15px 35px rgba(214, 51, 132, 0.2);
+            pointer-events: none; /* ให้คลิกทะลุกล่องไปโดนพื้นหลังได้ */
         }
 
         h1 {
-            font-size: 18vw; /* ขนาดตัวอักษรใหญ่ชัดเจนบนมือถือ */
+            font-size: 18vw;
             color: #ffffff;
-            text-shadow: 0 4px 10px rgba(214, 51, 132, 0.5);
+            text-shadow: 0 4px 10px rgba(214, 51, 132, 0.3);
             margin: 0;
-            animation: pulse 2.5s infinite ease-in-out;
         }
 
-        /* อนิเมชั่นให้นุ่มนวลขึ้น */
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.08); opacity: 0.9; }
+        /* สไตล์ของหัวใจสีน้ำเงินที่จะเกิดขึ้น */
+        .floating-heart {
+            position: absolute;
+            color: #007bff; /* สีน้ำเงิน */
+            font-size: 30px;
+            pointer-events: none;
+            z-index: 999;
+            animation: floatUp 1.5s ease-out forwards;
+            user-select: none;
         }
 
-        /* เพิ่มไอคอนหัวใจตกแต่ง */
-        .heart-icon {
-            color: white;
-            font-size: 8vw;
-            margin-top: 15px;
-            display: block;
+        @keyframes floatUp {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -150px) scale(1.5);
+                opacity: 0;
+            }
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body onclick="createHeart(event)" ontouchstart="createHeart(event)">
 
     <div class="circle circle-1"></div>
     <div class="circle circle-2"></div>
-    <div class="circle circle-3"></div>
 
     <div class="container">
         <h1>รักจิน</h1>
-        <div class="heart-icon">❤️</div>
     </div>
 
+    <script>
+        function createHeart(e) {
+            // ดึงพิกัดการจิ้ม (รองรับทั้ง Click และ Touch)
+            const x = e.clientX || (e.touches && e.touches[0].clientX);
+            const y = e.clientY || (e.touches && e.touches[0].clientY);
+
+            if (!x || !y) return;
+
+            // สร้าง element หัวใจ
+            const heart = document.createElement("div");
+            heart.innerHTML = "💙"; // หัวใจสีน้ำเงิน
+            heart.className = "floating-heart";
+            
+            // กำหนดตำแหน่งที่จิ้ม
+            heart.style.left = x + "px";
+            heart.style.top = y + "px";
+
+            // สุ่มองศาการเอียงเล็กน้อยให้ดูเป็นธรรมชาติ
+            const rotate = (Math.random() - 0.5) * 40;
+            heart.style.transform = `translate(-50%, -50%) rotate(${rotate}deg)`;
+
+            document.body.appendChild(heart);
+
+            // ลบ element ทิ้งหลังจากอนิเมชั่นจบ (1.5 วินาที)
+            setTimeout(() => {
+                heart.remove();
+            }, 1500);
+        }
+    </script>
 </body>
 </html>
