@@ -13,7 +13,11 @@ body { font-family:sans-serif; background:#f3f4f6; text-align:center; }
 button { width:100%; padding:14px; margin:6px 0; font-size:18px; border:none; border-radius:10px; background:#4f46e5; color:white; }
 button:disabled { background:#9ca3af; }
 input { width:100%; padding:12px; font-size:16px; }
+
 .choice { background:#6366f1; }
+.correct { background:#16a34a !important; }
+.wrong { background:#dc2626 !important; }
+
 .timer { font-size:22px; font-weight:bold; color:#dc2626; }
 </style>
 </head>
@@ -33,6 +37,7 @@ input { width:100%; padding:12px; font-size:16px; }
   <h2>HOST</h2>
   <p>PIN: <b id="roomPin"></b></p>
   <button onclick="nextQuestion()">▶ เริ่ม / ข้อถัดไป</button>
+  <button onclick="resetGame()" style="background:#dc2626;">🔄 รีเซ็ตเกม</button>
 </div>
 
 <div class="card" id="game" style="display:none;">
@@ -81,19 +86,14 @@ function createRoom(){
   document.getElementById("game").style.display="block";
   document.getElementById("roomPin").innerText = room;
 
-  db.ref(room).set({
-    qIndex: -1,
-    timer: 0,
-    players: {}
-  });
-
+  resetDB();
   listenRoom();
 }
 
 // ================= Join Room =================
 function joinRoom(){
-  room = document.getElementById("pinInput").value.trim();
-  const name = document.getElementById("nameInput").value.trim();
+  room = pinInput.value.trim();
+  const name = nameInput.value.trim();
   if(!room || !name) return alert("กรอก PIN และชื่อ");
 
   db.ref(room + "/players/" + playerId).set({
@@ -107,63 +107,96 @@ function joinRoom(){
   listenRoom();
 }
 
+// ================= Reset Game =================
+function resetDB(){
+  db.ref(room).set({
+    qIndex: -1,
+    timer: 0,
+    reveal: false,
+    players: {}
+  });
+}
+
+function resetGame(){
+  if(confirm("รีเซ็ตเกมทั้งหมด?")){
+    resetDB();
+  }
+}
+
 // ================= Listen Room =================
 function listenRoom(){
   db.ref(room).on("value", snap=>{
     const data = snap.val();
     if(!data) return;
 
-    currentTimer = data.timer || 0;
+    currentTimer = data.timer;
     currentQIndex = data.qIndex;
+    const reveal = data.reveal;
+
+    document.getElementById("timer").innerText =
+      currentTimer > 0 ? "⏱ " + currentTimer : "";
 
     const q = questions[currentQIndex];
-    if(!q){
-      document.getElementById("question").innerText = "รอ Host เริ่มเกม";
-      document.getElementById("choices").innerHTML = "";
-      return;
-    }
-
-    answered = false;
-    document.getElementById("question").innerText = q.text;
-    document.getElementById("timer").innerText = "⏱ " + currentTimer;
-
     const div = document.getElementById("choices");
     div.innerHTML = "";
 
+    if(!q){
+      question.innerText = "รอ Host เริ่มเกม";
+      return;
+    }
+
+    question.innerText = q.text;
+    answered = false;
+
     q.choices.forEach((c,i)=>{
       const btn = document.createElement("button");
-      btn.className = "choice";
       btn.innerText = c;
-      btn.onclick = () => submitAnswer(i);
+      btn.className = "choice";
+
+      if(reveal){
+        btn.disabled = true;
+        if(i === q.answer) btn.classList.add("correct");
+        else if(answeredChoice === i) btn.classList.add("wrong");
+      } else {
+        btn.onclick = () => submitAnswer(i);
+        if(currentTimer <= 0) btn.disabled = true;
+      }
+
       div.appendChild(btn);
     });
   });
 }
 
-// ================= Next Question (Host) =================
-function nextQuestion(){
-  db.ref(room + "/qIndex").transaction(i => (i ?? -1) + 1);
-  db.ref(room + "/timer").set(10);
-}
+let answeredChoice = null;
 
 // ================= Submit Answer =================
 function submitAnswer(choice){
-  if(answered || currentQIndex < 0) return;
+  if(answered || currentTimer <= 0) return;
   answered = true;
+  answeredChoice = choice;
 
   const correct = questions[currentQIndex].answer;
 
   if(choice === correct){
     db.ref(room + "/players/" + playerId + "/score")
-      .transaction(score => (score || 0) + currentTimer);
+      .transaction(s => (s || 0) + currentTimer);
   }
 }
 
-// ================= Timer (Host only) =================
+// ================= Host Controls =================
+function nextQuestion(){
+  db.ref(room + "/qIndex").transaction(i => (i ?? -1) + 1);
+  db.ref(room + "/timer").set(10);
+  db.ref(room + "/reveal").set(false);
+}
+
+// Timer
 setInterval(()=>{
   if(!isHost || !room) return;
+
   db.ref(room + "/timer").transaction(t=>{
     if(t > 0) return t - 1;
+    if(t === 0) db.ref(room + "/reveal").set(true);
     return t;
   });
 },1000);
@@ -172,15 +205,14 @@ setInterval(()=>{
 db.ref().on("value", snap=>{
   if(!room) return;
   const players = snap.child(room + "/players").val() || {};
-  const ul = document.getElementById("scores");
-  ul.innerHTML = "";
+  scores.innerHTML = "";
 
   Object.values(players)
     .sort((a,b)=>b.score-a.score)
     .forEach(p=>{
       const li = document.createElement("li");
       li.innerText = `${p.name}: ${p.score}`;
-      ul.appendChild(li);
+      scores.appendChild(li);
     });
 });
 </script>
