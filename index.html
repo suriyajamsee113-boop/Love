@@ -2,13 +2,13 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Math Quiz Party</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Firebase (compat for simple use) -->
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
@@ -19,53 +19,68 @@
   </style>
 </head>
 
-<body class="bg-indigo-900 text-white min-h-screen flex items-center justify-center p-4">
+<body class="bg-indigo-900 min-h-screen flex items-center justify-center p-4">
 
-<div id="app" class="w-full max-w-md bg-white text-gray-800 rounded-2xl shadow-2xl p-6">
+<div id="app" class="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6">
 
   <!-- HOME -->
-  <div id="home" class="text-center">
+  <div id="screen-home" class="text-center">
     <h1 class="text-3xl font-bold text-indigo-600 mb-4">Math Quiz Party 🎮</h1>
-    <button id="btn-host" class="w-full bg-indigo-600 ...">
-  สร้างห้องใหม่ (เป็นโฮสต์)
-</button>
 
-    <input id="join-id" placeholder="รหัสห้อง" class="w-full border p-3 rounded-xl mb-3 text-center uppercase">
-    <button id="btn-join-game" class="w-full bg-emerald-500 ...">
-  เข้าร่วมเกม
-</button>
+    <button id="btn-host"
+      class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl mb-4">
+      สร้างห้อง (โฮสต์)
+    </button>
+
+    <input id="join-id"
+      class="w-full border border-gray-300 rounded-xl px-4 py-3 mb-3 text-center uppercase"
+      placeholder="รหัสห้อง">
+
+    <button id="btn-join"
+      class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl">
+      เข้าร่วมเกม
+    </button>
   </div>
 
   <!-- NAME -->
-  <div id="name-screen" class="hidden text-center">
+  <div id="screen-name" class="hidden text-center">
     <h2 class="text-xl font-bold mb-3">ใส่ชื่อของคุณ</h2>
-    <input id="player-name" class="w-full border p-3 rounded-xl mb-3 text-center">
-    <button id="btn-enter" class="w-full bg-indigo-600 text-white py-3 rounded-xl">
+    <input id="player-name"
+      class="w-full border border-gray-300 rounded-xl px-4 py-3 mb-3 text-center">
+    <button id="btn-enter"
+      class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl">
       เข้าห้อง
     </button>
   </div>
 
   <!-- LOBBY -->
-  <div id="lobby" class="hidden">
+  <div id="screen-lobby" class="hidden">
     <h2 class="text-center font-bold mb-3">
       ห้อง: <span id="room-id" class="text-pink-500"></span>
     </h2>
-    <ul id="players" class="mb-4"></ul>
-    <button id="btn-start" class="hidden w-full bg-emerald-500 text-white py-3 rounded-xl">
+
+    <ul id="player-list" class="mb-4 space-y-1"></ul>
+
+    <button id="btn-start"
+      class="hidden w-full bg-emerald-500 text-white font-bold py-3 rounded-xl">
       เริ่มเกม
     </button>
   </div>
 
   <!-- QUIZ -->
-  <div id="quiz" class="hidden text-center">
+  <div id="screen-quiz" class="hidden text-center">
     <h2 id="question" class="text-xl font-bold mb-4"></h2>
     <div id="choices" class="space-y-3"></div>
   </div>
 
   <!-- RESULT -->
-  <div id="result" class="hidden">
+  <div id="screen-result" class="hidden">
     <h2 class="text-xl font-bold text-center mb-4">ผลคะแนน</h2>
-    <ul id="scores"></ul>
+    <ul id="score-list" class="space-y-2"></ul>
+    <button onclick="location.reload()"
+      class="mt-4 w-full bg-gray-200 py-3 rounded-xl font-bold">
+      กลับหน้าแรก
+    </button>
   </div>
 
 </div>
@@ -85,15 +100,18 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
+/* ================= STATE ================= */
 let uid = "";
 let room = "";
 let name = "";
 let isHost = false;
 let score = 0;
 
+/* ================= QUESTIONS ================= */
 const QUESTIONS = [
   { q: "205 + 330 = ?", c: ["535","525","545","635"], a: 0 },
   { q: "12 × 12 = ?", c: ["124","144","164","142"], a: 1 },
+  { q: "50% ของ 1000 = ?", c: ["250","400","500","600"], a: 2 }
 ];
 
 /* ================= INIT ================= */
@@ -109,8 +127,14 @@ function show(id) {
   document.getElementById(id).classList.remove("hidden");
 }
 
+/* ================= ELEMENTS ================= */
+const btnHost   = document.getElementById("btn-host");
+const btnJoin   = document.getElementById("btn-join");
+const btnEnter  = document.getElementById("btn-enter");
+const btnStart  = document.getElementById("btn-start");
+
 /* ================= HOST ================= */
-btn-host.onclick = async () => {
+btnHost.onclick = async () => {
   room = Math.random().toString(36).substring(2,8).toUpperCase();
   isHost = true;
 
@@ -120,26 +144,24 @@ btn-host.onclick = async () => {
     status: "waiting"
   });
 
-  show("name-screen");
+  show("screen-name");
 };
 
 /* ================= JOIN ================= */
-btn-join.onclick = async () => {
-  room = join-id.value.toUpperCase();
+btnJoin.onclick = async () => {
+  room = document.getElementById("join-id").value.toUpperCase();
   const snap = await db.doc(`rooms/${room}`).get();
   if (!snap.exists) return alert("ไม่พบห้อง");
-  show("name-screen");
+  show("screen-name");
 };
 
-btn-enter.onclick = async () => {
-  name = player-name.value;
-  await db.doc(`rooms/${room}/players/${uid}`).set({
-    name, score: 0
-  });
+btnEnter.onclick = async () => {
+  name = document.getElementById("player-name").value;
+  await db.doc(`rooms/${room}/players/${uid}`).set({ name, score: 0 });
 
-  room-id.innerText = room;
-  show("lobby");
-  if (isHost) btn-start.classList.remove("hidden");
+  document.getElementById("room-id").innerText = room;
+  show("screen-lobby");
+  if (isHost) btnStart.classList.remove("hidden");
   listen();
 };
 
@@ -147,26 +169,29 @@ btn-enter.onclick = async () => {
 function listen() {
   db.collection(`rooms/${room}/players`)
     .onSnapshot(snap => {
-      players.innerHTML = snap.docs.map(d => `<li>${d.data().name}</li>`).join("");
+      document.getElementById("player-list").innerHTML =
+        snap.docs.map(d => `<li>${d.data().name}</li>`).join("");
     });
 
   db.doc(`rooms/${room}`).onSnapshot(doc => {
-    const data = doc.data();
-    if (data.q >= 0) showQuestion(data.q);
-    if (data.status === "done") showResult();
+    const d = doc.data();
+    if (d.q >= 0) showQuestion(d.q);
+    if (d.status === "done") showResult();
   });
 }
 
-btn-start.onclick = async () => {
+btnStart.onclick = async () => {
   await db.doc(`rooms/${room}`).update({ q: 0 });
 };
 
 /* ================= QUIZ ================= */
 function showQuestion(i) {
-  show("quiz");
+  show("screen-quiz");
   const q = QUESTIONS[i];
-  question.innerText = q.q;
-  choices.innerHTML = "";
+  document.getElementById("question").innerText = q.q;
+
+  const box = document.getElementById("choices");
+  box.innerHTML = "";
 
   q.c.forEach((txt, idx) => {
     const b = document.createElement("button");
@@ -175,6 +200,7 @@ function showQuestion(i) {
     b.onclick = async () => {
       if (idx === q.a) score += 100;
       await db.doc(`rooms/${room}/players/${uid}`).update({ score });
+
       if (isHost) {
         if (i + 1 < QUESTIONS.length)
           await db.doc(`rooms/${room}`).update({ q: i + 1 });
@@ -182,18 +208,18 @@ function showQuestion(i) {
           await db.doc(`rooms/${room}`).update({ status: "done" });
       }
     };
-    choices.appendChild(b);
+    box.appendChild(b);
   });
 }
 
 /* ================= RESULT ================= */
 async function showResult() {
-  show("result");
+  show("screen-result");
   const snap = await db.collection(`rooms/${room}/players`).get();
-  scores.innerHTML = snap.docs
-    .map(d => d.data())
-    .sort((a,b)=>b.score-a.score)
-    .map(p => `<li>${p.name} : ${p.score}</li>`).join("");
+  document.getElementById("score-list").innerHTML =
+    snap.docs.map(d => d.data())
+      .sort((a,b)=>b.score-a.score)
+      .map(p => `<li>${p.name} : ${p.score}</li>`).join("");
 }
 </script>
 
