@@ -32,11 +32,11 @@ input { width:100%; padding:12px; font-size:16px; }
 <div class="card" id="host" style="display:none;">
   <h2>HOST</h2>
   <p>PIN: <b id="roomPin"></b></p>
-  <button onclick="nextQuestion()">▶ ข้อถัดไป</button>
+  <button onclick="nextQuestion()">▶ เริ่ม / ข้อถัดไป</button>
 </div>
 
 <div class="card" id="game" style="display:none;">
-  <h2 id="question"></h2>
+  <h2 id="question">รอ Host เริ่มเกม</h2>
   <div class="timer" id="timer"></div>
   <div id="choices"></div>
 </div>
@@ -47,33 +47,38 @@ input { width:100%; padding:12px; font-size:16px; }
 </div>
 
 <script>
-// ===== Firebase =====
+// ================= Firebase =================
 firebase.initializeApp({
   apiKey: "AIzaSyCWZRDRx0SYNivY2BIsepJZxwjkYKtnKms",
   authDomain: "game-6fda9.firebaseapp.com",
   databaseURL: "https://game-6fda9-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "game-6fda9",
+  projectId: "game-6fda9"
 });
 const db = firebase.database();
 
-// ===== Game Data =====
+// ================= Questions =================
 const questions = [
   { text:"205 + 330 = ?", choices:["500","520","535","550"], answer:1 },
   { text:"100 × 5 = ?", choices:["200","300","500","1000"], answer:2 },
   { text:"900 ÷ 3 = ?", choices:["200","300","400","500"], answer:1 }
 ];
 
+// ================= State =================
 let room = "";
 let playerId = Math.random().toString(36).substr(2,9);
 let isHost = false;
 let answered = false;
+let currentTimer = 0;
+let currentQIndex = -1;
 
-// ===== Create Room =====
+// ================= Create Room =================
 function createRoom(){
   room = Math.floor(100000 + Math.random()*900000).toString();
   isHost = true;
+
   document.getElementById("home").style.display="none";
   document.getElementById("host").style.display="block";
+  document.getElementById("game").style.display="block";
   document.getElementById("roomPin").innerText = room;
 
   db.ref(room).set({
@@ -81,12 +86,14 @@ function createRoom(){
     timer: 0,
     players: {}
   });
+
+  listenRoom();
 }
 
-// ===== Join Room =====
+// ================= Join Room =================
 function joinRoom(){
-  room = document.getElementById("pinInput").value;
-  const name = document.getElementById("nameInput").value;
+  room = document.getElementById("pinInput").value.trim();
+  const name = document.getElementById("nameInput").value.trim();
   if(!room || !name) return alert("กรอก PIN และชื่อ");
 
   db.ref(room + "/players/" + playerId).set({
@@ -96,77 +103,87 @@ function joinRoom(){
 
   document.getElementById("home").style.display="none";
   document.getElementById("game").style.display="block";
+
+  listenRoom();
 }
 
-// ===== Host: Next Question =====
+// ================= Listen Room =================
+function listenRoom(){
+  db.ref(room).on("value", snap=>{
+    const data = snap.val();
+    if(!data) return;
+
+    currentTimer = data.timer || 0;
+    currentQIndex = data.qIndex;
+
+    const q = questions[currentQIndex];
+    if(!q){
+      document.getElementById("question").innerText = "รอ Host เริ่มเกม";
+      document.getElementById("choices").innerHTML = "";
+      return;
+    }
+
+    answered = false;
+    document.getElementById("question").innerText = q.text;
+    document.getElementById("timer").innerText = "⏱ " + currentTimer;
+
+    const div = document.getElementById("choices");
+    div.innerHTML = "";
+
+    q.choices.forEach((c,i)=>{
+      const btn = document.createElement("button");
+      btn.className = "choice";
+      btn.innerText = c;
+      btn.onclick = () => submitAnswer(i);
+      div.appendChild(btn);
+    });
+  });
+}
+
+// ================= Next Question (Host) =================
 function nextQuestion(){
   db.ref(room + "/qIndex").transaction(i => (i ?? -1) + 1);
   db.ref(room + "/timer").set(10);
 }
 
-// ===== Question Listener =====
-db.ref().on("value", snap=>{
-  if(!room) return;
-  const data = snap.child(room).val();
-  if(!data) return;
+// ================= Submit Answer =================
+function submitAnswer(choice){
+  if(answered || currentQIndex < 0) return;
+  answered = true;
 
-  const q = questions[data.qIndex];
-  if(!q) return;
+  const correct = questions[currentQIndex].answer;
 
-  answered = false;
-  document.getElementById("question").innerText = q.text;
-  const div = document.getElementById("choices");
-  div.innerHTML = "";
-
-  q.choices.forEach((c,i)=>{
-    const btn = document.createElement("button");
-    btn.className="choice";
-    btn.innerText=c;
-    btn.onclick=()=>submitAnswer(i,q.answer,data.timer);
-    div.appendChild(btn);
-  });
-});
-
-// ===== Answer =====
-function submitAnswer(choice,correct,time){
-  if(answered) return;
-  answered=true;
-
-  if(choice===correct){
-    db.ref(room+"/players/"+playerId+"/score")
-      .transaction(s=>(s||0)+time);
+  if(choice === correct){
+    db.ref(room + "/players/" + playerId + "/score")
+      .transaction(score => (score || 0) + currentTimer);
   }
 }
 
-// ===== Timer =====
+// ================= Timer (Host only) =================
 setInterval(()=>{
   if(!isHost || !room) return;
-  db.ref(room+"/timer").transaction(t=>{
-    if(t>0) return t-1;
+  db.ref(room + "/timer").transaction(t=>{
+    if(t > 0) return t - 1;
     return t;
   });
 },1000);
 
-db.ref().on("value",snap=>{
+// ================= Leaderboard =================
+db.ref().on("value", snap=>{
   if(!room) return;
-  const t = snap.child(room+"/timer").val();
-  if(t!=null) document.getElementById("timer").innerText="⏱ "+t;
-});
-
-// ===== Leaderboard =====
-db.ref().on("value",snap=>{
-  if(!room) return;
-  const players = snap.child(room+"/players").val()||{};
+  const players = snap.child(room + "/players").val() || {};
   const ul = document.getElementById("scores");
-  ul.innerHTML="";
+  ul.innerHTML = "";
+
   Object.values(players)
     .sort((a,b)=>b.score-a.score)
     .forEach(p=>{
-      const li=document.createElement("li");
-      li.innerText=`${p.name}: ${p.score}`;
+      const li = document.createElement("li");
+      li.innerText = `${p.name}: ${p.score}`;
       ul.appendChild(li);
     });
 });
 </script>
+
 </body>
 </html>
