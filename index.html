@@ -1,393 +1,200 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Math Quiz Party</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap');
-        body { font-family: 'Kanit', sans-serif; }
-        .option-btn { transition: all 0.2s; }
-        .option-btn:active { transform: scale(0.95); }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Math Quiz Party</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Firebase (compat for simple use) -->
+  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap');
+    body { font-family: 'Kanit', sans-serif; }
+  </style>
 </head>
-<body class="bg-indigo-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
 
-    <div id="app" class="w-full max-w-md bg-white text-gray-800 rounded-2xl shadow-2xl p-6 overflow-hidden">
-        <!-- Loading Screen -->
-        <div id="loading" class="text-center py-10">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <p>กำลังเชื่อมต่อระบบ...</p>
-        </div>
+<body class="bg-indigo-900 text-white min-h-screen flex items-center justify-center p-4">
 
-        <!-- Home Screen -->
-        <div id="screen-home" class="hidden text-center">
-            <h1 class="text-3xl font-bold text-indigo-600 mb-6">Math Quiz Party! 🎮</h1>
-            <p class="mb-8 text-gray-600">ท้าทายเพื่อนของคุณด้วยโจทย์คณิตศาสตร์สุดมันส์</p>
-            <button id="btn-create-game" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl mb-4 shadow-lg">
-                สร้างห้องใหม่ (เป็นโฮสต์)
-            </button>
-            <div class="relative flex py-5 items-center">
-                <div class="flex-grow border-t border-gray-300"></div>
-                <span class="flex-shrink mx-4 text-gray-400 text-sm">หรือใส่รหัสเพื่อเข้าเล่น</span>
-                <div class="flex-grow border-t border-gray-300"></div>
-            </div>
-            <input id="input-game-id" type="text" placeholder="รหัสห้องเกม" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-4 focus:border-indigo-500 outline-none uppercase text-center font-bold tracking-widest">
-            <button id="btn-join-game" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg">
-                เข้าร่วมเกม
-            </button>
-        </div>
+<div id="app" class="w-full max-w-md bg-white text-gray-800 rounded-2xl shadow-2xl p-6">
 
-        <!-- Join Name Screen -->
-        <div id="screen-join-name" class="hidden text-center">
-            <h2 class="text-2xl font-bold mb-4">ยินดีต้อนรับ!</h2>
-            <p class="mb-6 text-gray-600">บอกชื่อเท่ๆ ของคุณหน่อย</p>
-            <input id="input-player-name" type="text" maxlength="12" placeholder="ชื่อของคุณ" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-6 text-center text-xl font-semibold">
-            <button id="btn-confirm-join" class="w-full bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl">เข้าสู่ห้องรอ</button>
-        </div>
+  <!-- HOME -->
+  <div id="home" class="text-center">
+    <h1 class="text-3xl font-bold text-indigo-600 mb-4">Math Quiz Party 🎮</h1>
+    <button id="btn-host" class="w-full bg-indigo-600 text-white py-3 rounded-xl mb-4">
+      สร้างห้อง (โฮสต์)
+    </button>
+    <input id="join-id" placeholder="รหัสห้อง" class="w-full border p-3 rounded-xl mb-3 text-center uppercase">
+    <button id="btn-join" class="w-full bg-emerald-500 text-white py-3 rounded-xl">
+      เข้าร่วมเกม
+    </button>
+  </div>
 
-        <!-- Lobby Screen -->
-        <div id="screen-lobby" class="hidden">
-            <div class="text-center mb-6">
-                <h2 class="text-xl font-bold text-indigo-600">รหัสห้อง: <span id="display-game-id" class="text-2xl text-pink-500">----</span></h2>
-                <p class="text-sm text-gray-500 mt-2">แชร์รหัสนี้ให้เพื่อนๆ</p>
-                <button id="btn-copy-link" class="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full mt-2 text-indigo-600">คัดลอกลิงก์เกม</button>
-            </div>
-            <div class="bg-gray-50 rounded-xl p-4 min-h-[200px] mb-6">
-                <h3 class="font-semibold mb-3 border-b pb-2">ผู้เล่นในห้อง (<span id="player-count">0</span>)</h3>
-                <ul id="player-list" class="flex flex-wrap gap-2">
-                    <!-- Players appear here -->
-                </ul>
-            </div>
-            <div id="host-controls" class="hidden">
-                <button id="btn-start-game" class="w-full bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-md">เริ่มเกมเลย!</button>
-                <p class="text-xs text-center text-gray-400 mt-2">มีแต่คุณ (โฮสต์) ที่กดเริ่มได้</p>
-            </div>
-            <div id="player-waiting" class="text-center text-gray-500 italic py-4">
-                รอโฮสต์เริ่มเกม...
-            </div>
-        </div>
+  <!-- NAME -->
+  <div id="name-screen" class="hidden text-center">
+    <h2 class="text-xl font-bold mb-3">ใส่ชื่อของคุณ</h2>
+    <input id="player-name" class="w-full border p-3 rounded-xl mb-3 text-center">
+    <button id="btn-enter" class="w-full bg-indigo-600 text-white py-3 rounded-xl">
+      เข้าห้อง
+    </button>
+  </div>
 
-        <!-- Quiz Screen -->
-        <div id="screen-quiz" class="hidden">
-            <div class="flex justify-between items-center mb-4">
-                <span class="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full text-xs font-bold" id="question-number">ข้อที่ 1/5</span>
-                <span class="text-pink-500 font-bold" id="timer">--</span>
-            </div>
-            <div id="question-area" class="text-center mb-8">
-                <h2 id="question-text" class="text-2xl font-bold text-gray-800 leading-tight">โจทย์จะปรากฏที่นี่</h2>
-            </div>
-            <div id="options-grid" class="grid grid-cols-1 gap-3">
-                <button class="option-btn w-full py-4 px-6 rounded-xl bg-red-500 text-white font-bold text-left flex items-center shadow-md hover:brightness-110" data-idx="0">
-                    <span class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center mr-4">▲</span>
-                    <span class="option-text">ตัวเลือก 1</span>
-                </button>
-                <button class="option-btn w-full py-4 px-6 rounded-xl bg-blue-500 text-white font-bold text-left flex items-center shadow-md hover:brightness-110" data-idx="1">
-                    <span class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center mr-4">◆</span>
-                    <span class="option-text">ตัวเลือก 2</span>
-                </button>
-                <button class="option-btn w-full py-4 px-6 rounded-xl bg-yellow-500 text-white font-bold text-left flex items-center shadow-md hover:brightness-110" data-idx="2">
-                    <span class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center mr-4">●</span>
-                    <span class="option-text">ตัวเลือก 3</span>
-                </button>
-                <button class="option-btn w-full py-4 px-6 rounded-xl bg-emerald-500 text-white font-bold text-left flex items-center shadow-md hover:brightness-110" data-idx="3">
-                    <span class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center mr-4">■</span>
-                    <span class="option-text">ตัวเลือก 4</span>
-                </button>
-            </div>
-            <div id="answer-status" class="hidden text-center mt-6 animate-bounce">
-                <p class="text-xl font-bold italic" id="status-text">ตอบแล้ว! รอดูผลลัพธ์...</p>
-            </div>
-        </div>
+  <!-- LOBBY -->
+  <div id="lobby" class="hidden">
+    <h2 class="text-center font-bold mb-3">
+      ห้อง: <span id="room-id" class="text-pink-500"></span>
+    </h2>
+    <ul id="players" class="mb-4"></ul>
+    <button id="btn-start" class="hidden w-full bg-emerald-500 text-white py-3 rounded-xl">
+      เริ่มเกม
+    </button>
+  </div>
 
-        <!-- Result Screen -->
-        <div id="screen-result" class="hidden text-center">
-            <div id="result-icon" class="text-6xl mb-4">🎉</div>
-            <h2 id="result-title" class="text-2xl font-bold mb-2">สรุปคะแนน</h2>
-            <div class="bg-indigo-50 rounded-2xl p-6 mb-6">
-                <ul id="leaderboard" class="space-y-3">
-                    <!-- High scores -->
-                </ul>
-            </div>
-            <button onclick="location.reload()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-xl">กลับหน้าหลัก</button>
-        </div>
-    </div>
+  <!-- QUIZ -->
+  <div id="quiz" class="hidden text-center">
+    <h2 id="question" class="text-xl font-bold mb-4"></h2>
+    <div id="choices" class="space-y-3"></div>
+  </div>
 
-    <script>
-        // --- Firebase Setup ---
-        const firebaseConfig = JSON.parse(__firebase_config);
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'math-quiz-app';
+  <!-- RESULT -->
+  <div id="result" class="hidden">
+    <h2 class="text-xl font-bold text-center mb-4">ผลคะแนน</h2>
+    <ul id="scores"></ul>
+  </div>
 
-        // --- Game Config & Questions ---
-        const QUESTIONS = [
-            { q: "205 + 330 ได้เท่าไหร่?", options: ["535", "545", "525", "635"], correct: 0 },
-            { q: "12 × 12 มีค่าเท่าใด?", options: ["124", "144", "164", "142"], correct: 1 },
-            { q: "99 - (15 + 24) = ?", options: ["50", "60", "70", "80"], correct: 1 },
-            { q: "ครึ่งหนึ่งของ 500 คืออะไร?", options: ["200", "225", "250", "300"], correct: 2 },
-            { q: "100 ÷ 4 × 2 = ?", options: ["25", "50", "12.5", "10"], correct: 1 }
-        ];
-
-        // --- State ---
-        let currentGameId = null;
-        let myPlayerId = null;
-        let myName = "";
-        let isHost = false;
-        let currentQuestionIdx = -1;
-        let hasAnswered = false;
-        let score = 0;
-
-        // --- UI Helper ---
-        function showScreen(screenId) {
-            document.querySelectorAll('#app > div').forEach(div => div.classList.add('hidden'));
-            document.getElementById(screenId).classList.remove('hidden');
-        }
-
-        function showMessage(msg) {
-            const toast = document.createElement('div');
-            toast.className = "fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg text-sm z-50 shadow-xl";
-            toast.innerText = msg;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 2500);
-        }
+</div>
 
 <script>
+/* ================= FIREBASE SETUP ================= */
 const firebaseConfig = {
   apiKey: "AIzaSyCwZRDRx0SYNivY2BIsepJZxwjKYkTnKms",
   authDomain: "game-6fda9.firebaseapp.com",
-  databaseURL: "https://game-6fda9-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "game-6fda9",
   storageBucket: "game-6fda9.firebasestorage.app",
   messagingSenderId: "121486223888",
-  appId: "1:121486223888:web:10f81ae5f492e80d31b895",
-  measurementId: "G-3KK1KLJ71E"
+  appId: "1:121486223888:web:10f81ae5f492e80d31b895"
 };
 
 firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+let uid = "";
+let room = "";
+let name = "";
+let isHost = false;
+let score = 0;
+
+const QUESTIONS = [
+  { q: "205 + 330 = ?", c: ["535","525","545","635"], a: 0 },
+  { q: "12 × 12 = ?", c: ["124","144","164","142"], a: 1 },
+];
+
+/* ================= INIT ================= */
+async function init() {
+  await auth.signInAnonymously();
+  uid = auth.currentUser.uid;
+}
+init();
+
+/* ================= HELPERS ================= */
+function show(id) {
+  document.querySelectorAll("#app > div").forEach(d => d.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+}
+
+/* ================= HOST ================= */
+btn-host.onclick = async () => {
+  room = Math.random().toString(36).substring(2,8).toUpperCase();
+  isHost = true;
+
+  await db.doc(`rooms/${room}`).set({
+    host: uid,
+    q: -1,
+    status: "waiting"
+  });
+
+  show("name-screen");
+};
+
+/* ================= JOIN ================= */
+btn-join.onclick = async () => {
+  room = join-id.value.toUpperCase();
+  const snap = await db.doc(`rooms/${room}`).get();
+  if (!snap.exists) return alert("ไม่พบห้อง");
+  show("name-screen");
+};
+
+btn-enter.onclick = async () => {
+  name = player-name.value;
+  await db.doc(`rooms/${room}/players/${uid}`).set({
+    name, score: 0
+  });
+
+  room-id.innerText = room;
+  show("lobby");
+  if (isHost) btn-start.classList.remove("hidden");
+  listen();
+};
+
+/* ================= LOBBY ================= */
+function listen() {
+  db.collection(`rooms/${room}/players`)
+    .onSnapshot(snap => {
+      players.innerHTML = snap.docs.map(d => `<li>${d.data().name}</li>`).join("");
+    });
+
+  db.doc(`rooms/${room}`).onSnapshot(doc => {
+    const data = doc.data();
+    if (data.q >= 0) showQuestion(data.q);
+    if (data.status === "done") showResult();
+  });
+}
+
+btn-start.onclick = async () => {
+  await db.doc(`rooms/${room}`).update({ q: 0 });
+};
+
+/* ================= QUIZ ================= */
+function showQuestion(i) {
+  show("quiz");
+  const q = QUESTIONS[i];
+  question.innerText = q.q;
+  choices.innerHTML = "";
+
+  q.c.forEach((txt, idx) => {
+    const b = document.createElement("button");
+    b.className = "w-full bg-indigo-500 text-white py-3 rounded-xl";
+    b.innerText = txt;
+    b.onclick = async () => {
+      if (idx === q.a) score += 100;
+      await db.doc(`rooms/${room}/players/${uid}`).update({ score });
+      if (isHost) {
+        if (i + 1 < QUESTIONS.length)
+          await db.doc(`rooms/${room}`).update({ q: i + 1 });
+        else
+          await db.doc(`rooms/${room}`).update({ status: "done" });
+      }
+    };
+    choices.appendChild(b);
+  });
+}
+
+/* ================= RESULT ================= */
+async function showResult() {
+  show("result");
+  const snap = await db.collection(`rooms/${room}/players`).get();
+  scores.innerHTML = snap.docs
+    .map(d => d.data())
+    .sort((a,b)=>b.score-a.score)
+    .map(p => `<li>${p.name} : ${p.score}</li>`).join("");
+}
 </script>
 
-
-        // --- Game Logic ---
-
-        // 1. Create Game
-        document.getElementById('btn-create-game').onclick = async () => {
-            const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
-            isHost = true;
-            await setupGame(gameId);
-        };
-
-        // 2. Join Game (Step 1: Check ID)
-        document.getElementById('btn-join-game').onclick = async () => {
-            const gid = document.getElementById('input-game-id').value.toUpperCase().trim();
-            if (!gid) return showMessage("กรุณาใส่รหัสเกม");
-            
-            const gameRef = db.doc(`artifacts/${appId}/public/data/sessions/${gid}`);
-            const snap = await gameRef.get();
-            if (!snap.exists()) return showMessage("ไม่พบห้องเกมนี้");
-            
-            currentGameId = gid;
-            showScreen('screen-join-name');
-        };
-
-        // 3. Confirm Name and Join Lobby
-        document.getElementById('btn-confirm-join').onclick = async () => {
-            const name = document.getElementById('input-player-name').value.trim();
-            if (!name) return showMessage("กรุณาใส่ชื่อ");
-            myName = name;
-            myPlayerId = auth.currentUser.uid;
-            await enterLobby();
-        };
-
-        async function setupGame(gameId) {
-            currentGameId = gameId;
-            myPlayerId = auth.currentUser.uid;
-            myName = "โฮสต์"; // Default host name
-            
-            await db.doc(`artifacts/${appId}/public/data/sessions/${gameId}`).set({
-                status: 'waiting',
-                currentQuestion: -1,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                hostId: myPlayerId
-            });
-
-            await enterLobby();
-        }
-
-        async function enterLobby() {
-            // Register player
-            await db.doc(`artifacts/${appId}/public/data/players/${currentGameId}_${myPlayerId}`).set({
-                name: myName,
-                score: 0,
-                gameId: currentGameId,
-                lastAnswered: -1
-            });
-
-            document.getElementById('display-game-id').innerText = currentGameId;
-            showScreen('screen-lobby');
-
-            if (isHost) {
-                document.getElementById('host-controls').classList.remove('hidden');
-                document.getElementById('player-waiting').classList.add('hidden');
-            }
-
-            listenToGame();
-        }
-
-        // 4. Listeners
-        function listenToGame() {
-            // Listen for Players
-            db.collection(`artifacts/${appId}/public/data/players`)
-                .where('gameId', '==', currentGameId)
-                .onSnapshot(snap => {
-                    const players = snap.docs.map(doc => doc.data());
-                    document.getElementById('player-count').innerText = players.length;
-                    const list = document.getElementById('player-list');
-                    list.innerHTML = players.map(p => `
-                        <li class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium border border-indigo-200">
-                            ${p.name} ${p.name === myName ? '(คุณ)' : ''}
-                        </li>
-                    `).join('');
-                });
-
-            // Listen for Game State
-            db.doc(`artifacts/${appId}/public/data/sessions/${currentGameId}`).onSnapshot(doc => {
-                const data = doc.data();
-                if (!data) return;
-
-                if (data.status === 'playing') {
-                    if (data.currentQuestion !== currentQuestionIdx) {
-                        startQuestion(data.currentQuestion);
-                    }
-                } else if (data.status === 'finished') {
-                    showFinalResults();
-                }
-            });
-        }
-
-        // 5. Question Handling
-        function startQuestion(idx) {
-            currentQuestionIdx = idx;
-            hasAnswered = false;
-            showScreen('screen-quiz');
-            document.getElementById('answer-status').classList.add('hidden');
-            document.getElementById('options-grid').classList.remove('opacity-50', 'pointer-events-none');
-            
-            const q = QUESTIONS[idx];
-            document.getElementById('question-number').innerText = `ข้อที่ ${idx + 1}/${QUESTIONS.length}`;
-            document.getElementById('question-text').innerText = q.q;
-            
-            const btns = document.querySelectorAll('.option-btn');
-            btns.forEach((btn, i) => {
-                btn.querySelector('.option-text').innerText = q.options[i];
-            });
-
-            // Simple timer simulation (visual only, real logic can be complex)
-            let timeLeft = 15;
-            const timerEl = document.getElementById('timer');
-            timerEl.innerText = timeLeft;
-            const timerInt = setInterval(() => {
-                timeLeft--;
-                timerEl.innerText = timeLeft;
-                if (timeLeft <= 0 || hasAnswered) clearInterval(timerInt);
-                if (timeLeft <= 0 && !hasAnswered && isHost) {
-                    // Host can auto-next, but for simplicity we let host click
-                }
-            }, 1000);
-        }
-
-        // 6. Answer Question
-        document.querySelectorAll('.option-btn').forEach(btn => {
-            btn.onclick = async () => {
-                if (hasAnswered) return;
-                hasAnswered = true;
-                
-                const chosenIdx = parseInt(btn.dataset.idx);
-                const isCorrect = chosenIdx === QUESTIONS[currentQuestionIdx].correct;
-                
-                if (isCorrect) {
-                    score += 100;
-                    btn.classList.add('ring-4', 'ring-white');
-                }
-                
-                document.getElementById('options-grid').classList.add('opacity-50', 'pointer-events-none');
-                document.getElementById('answer-status').classList.remove('hidden');
-                document.getElementById('status-text').innerText = isCorrect ? "ถูกต้อง! +100" : "ว้าว.. เกือบถูกแล้ว";
-                document.getElementById('status-text').className = isCorrect ? "text-xl font-bold italic text-emerald-500" : "text-xl font-bold italic text-red-500";
-
-                // Update score in DB
-                await db.doc(`artifacts/${appId}/public/data/players/${currentGameId}_${myPlayerId}`).update({
-                    score: score,
-                    lastAnswered: currentQuestionIdx
-                });
-
-                // If host, show "Next" button after delay
-                if (isHost) {
-                    setTimeout(() => {
-                        const nextBtn = document.createElement('button');
-                        nextBtn.className = "w-full bg-indigo-600 text-white font-bold py-3 mt-4 rounded-xl shadow-lg animate-pulse";
-                        nextBtn.innerText = currentQuestionIdx === QUESTIONS.length - 1 ? "จบเกมและดูผล" : "ข้อถัดไป ➔";
-                        nextBtn.onclick = async () => {
-                            if (currentQuestionIdx === QUESTIONS.length - 1) {
-                                await db.doc(`artifacts/${appId}/public/data/sessions/${currentGameId}`).update({ status: 'finished' });
-                            } else {
-                                await db.doc(`artifacts/${appId}/public/data/sessions/${currentGameId}`).update({ currentQuestion: currentQuestionIdx + 1 });
-                            }
-                            nextBtn.remove();
-                        };
-                        document.getElementById('screen-quiz').appendChild(nextBtn);
-                    }, 2000);
-                }
-            };
-        });
-
-        // 7. Start Game Button (Host Only)
-        document.getElementById('btn-start-game').onclick = async () => {
-            await db.doc(`artifacts/${appId}/public/data/sessions/${currentGameId}`).update({
-                status: 'playing',
-                currentQuestion: 0
-            });
-        };
-
-        // 8. Results
-        async function showFinalResults() {
-            showScreen('screen-result');
-            const snap = await db.collection(`artifacts/${appId}/public/data/players`)
-                .where('gameId', '==', currentGameId)
-                .get();
-            
-            const players = snap.docs.map(doc => doc.data()).sort((a, b) => b.score - a.score);
-            const leaderboard = document.getElementById('leaderboard');
-            leaderboard.innerHTML = players.map((p, i) => `
-                <li class="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border-l-4 ${i === 0 ? 'border-yellow-400' : 'border-indigo-400'}">
-                    <span class="flex items-center">
-                        <span class="font-bold mr-3 w-6">${i + 1}.</span>
-                        <span class="font-semibold text-gray-700">${p.name} ${p.name === myName ? '(คุณ)' : ''}</span>
-                    </span>
-                    <span class="font-bold text-indigo-600">${p.score} pt</span>
-                </li>
-            `).join('');
-        }
-
-        // 9. Copy Link
-        document.getElementById('btn-copy-link').onclick = () => {
-            const url = window.location.origin + window.location.pathname + '?game=' + currentGameId;
-            const tempInput = document.createElement('input');
-            document.body.appendChild(tempInput);
-            tempInput.value = url;
-            tempInput.select();
-            document.execCommand('copy');
-            document.body.removeChild(tempInput);
-            showMessage("คัดลอกลิงก์แล้ว! ส่งให้เพื่อนได้เลย");
-        };
-
-        init();
-    </script>
 </body>
 </html>
