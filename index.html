@@ -10,6 +10,7 @@
 <style>
 body { font-family:sans-serif; background:#f3f4f6; text-align:center; }
 .card { background:#fff; padding:20px; margin:20px auto; border-radius:14px; max-width:420px; }
+
 button {
   width:100%;
   padding:14px;
@@ -19,7 +20,7 @@ button {
   border-radius:10px;
   background:#4f46e5;
   color:white;
-  transition: transform 0.1s ease, background 0.2s ease;
+  transition: transform 0.12s ease, background 0.2s ease;
 }
 button:active { transform: scale(0.94); }
 button:disabled { background:#9ca3af; transform:none; }
@@ -31,6 +32,7 @@ input { width:100%; padding:12px; font-size:16px; }
 .wrong { background:#dc2626 !important; }
 
 .timer { font-size:22px; font-weight:bold; color:#dc2626; }
+.muted { color:#6b7280; font-size:18px; }
 </style>
 </head>
 <body>
@@ -84,8 +86,10 @@ const questions = [
 let room = "";
 let playerId = Math.random().toString(36).substr(2,9);
 let isHost = false;
+
 let answered = false;
 let answeredChoice = null;
+
 let currentTimer = 0;
 let currentQIndex = -1;
 
@@ -156,8 +160,18 @@ function listenRoom(){
     }
 
     question.innerText = q.text;
-    answered = false;
-    answeredChoice = null;
+
+    // รีเซ็ตสถานะเมื่อขึ้นข้อใหม่
+    if(!reveal){
+      answered = false;
+      answeredChoice = null;
+    }
+
+    // ถ้าผู้เล่นตอบไปแล้ว และยังไม่เฉลย
+    if(answered && !reveal){
+      choices.innerHTML = "<p class='muted'>ส่งคำตอบแล้ว ⏳</p>";
+      return;
+    }
 
     q.choices.forEach((c,i)=>{
       const btn = document.createElement("button");
@@ -185,17 +199,19 @@ function submitAnswer(choice, btn){
   answered = true;
   answeredChoice = choice;
 
-  // 🔒 ปิดทุกปุ่มทันที
-  document.querySelectorAll(".choice").forEach(b=>b.disabled=true);
-
-  // 🎯 Animation ยุบ + feedback
+  // 🎯 Animation ยุบ
   btn.style.transform = "scale(0.9)";
-  setTimeout(()=>btn.style.transform="scale(1)",100);
+  setTimeout(()=>btn.style.transform="scale(1)",120);
+
+  // ❌ ลบตัวเลือกทั้งหมดหลัง animation
+  setTimeout(()=>{
+    choices.innerHTML = "<p class='muted'>ส่งคำตอบแล้ว ⏳</p>";
+  },150);
 
   const correct = questions[currentQIndex].answer;
   if(choice === correct){
     db.ref(room+"/players/"+playerId+"/score")
-      .transaction(s=>(s||0)+currentTimer);
+      .transaction(s => (s || 0) + currentTimer);
   }
 }
 
@@ -210,8 +226,8 @@ setInterval(()=>{
   if(!isHost || !room) return;
 
   db.ref(room+"/timer").transaction(t=>{
-    if(t>0) return t-1;
-    if(t===0) db.ref(room+"/reveal").set(true);
+    if(t > 0) return t - 1;
+    if(t === 0) db.ref(room+"/reveal").set(true);
     return t;
   });
 },1000);
@@ -221,6 +237,7 @@ db.ref().on("value", snap=>{
   if(!room) return;
   const players = snap.child(room+"/players").val()||{};
   scores.innerHTML="";
+
   Object.values(players)
     .sort((a,b)=>b.score-a.score)
     .forEach(p=>{
