@@ -157,15 +157,22 @@
             setTimeout(() => toast.remove(), 2500);
         }
 
-        const firebaseConfig = {
-  apiKey: "AIzaSyCWZRDRx0SYNivY2BIsepJZxwjkYKtnKms",
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCwZRDRx0SYNivY2BIsepJZxwjKYkTnKms",
   authDomain: "game-6fda9.firebaseapp.com",
+  databaseURL: "https://game-6fda9-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "game-6fda9",
   storageBucket: "game-6fda9.firebasestorage.app",
   messagingSenderId: "121486223888",
   appId: "1:121486223888:web:10f81ae5f492e80d31b895",
   measurementId: "G-3KK1KLJ71E"
 };
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+</script>
+
 
         // --- Game Logic ---
 
