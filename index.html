@@ -20,10 +20,10 @@ button {
   border-radius:10px;
   background:#4f46e5;
   color:white;
-  transition: transform 0.12s ease, background 0.2s ease;
+  transition: transform 0.12s ease;
 }
 button:active { transform: scale(0.94); }
-button:disabled { background:#9ca3af; transform:none; }
+button:disabled { background:#9ca3af; }
 
 input { width:100%; padding:12px; font-size:16px; }
 
@@ -50,7 +50,7 @@ input { width:100%; padding:12px; font-size:16px; }
 <div class="card" id="host" style="display:none;">
   <h2>HOST</h2>
   <p>PIN: <b id="roomPin"></b></p>
-  <button onclick="nextQuestion()">▶ เริ่ม / ข้อถัดไป</button>
+  <button onclick="nextQuestion()">▶ ข้อถัดไป</button>
   <button onclick="resetGame()" style="background:#dc2626;">🔄 รีเซ็ตเกม</button>
 </div>
 
@@ -86,12 +86,6 @@ const questions = [
 let room = "";
 let playerId = Math.random().toString(36).substr(2,9);
 let isHost = false;
-
-let answered = false;
-let answeredChoice = null;
-
-let currentTimer = 0;
-let currentQIndex = -1;
 
 // ================= Create / Join =================
 function createRoom(){
@@ -129,6 +123,7 @@ function resetDB(){
     qIndex:-1,
     timer:0,
     reveal:false,
+    answeredPlayers:{},
     players:{}
   });
 }
@@ -145,13 +140,15 @@ function listenRoom(){
     const data = snap.val();
     if(!data) return;
 
-    currentTimer = data.timer;
-    currentQIndex = data.qIndex;
+    const qIndex = data.qIndex;
+    const timer = data.timer;
     const reveal = data.reveal;
+    const answeredPlayers = data.answeredPlayers || {};
 
-    timer.innerText = currentTimer > 0 ? "⏱ "+currentTimer : "";
+    timer && (document.getElementById("timer").innerText = "⏱ "+timer);
+    if(timer === 0) document.getElementById("timer").innerText = "";
 
-    const q = questions[currentQIndex];
+    const q = questions[qIndex];
     choices.innerHTML = "";
 
     if(!q){
@@ -161,70 +158,56 @@ function listenRoom(){
 
     question.innerText = q.text;
 
-    // รีเซ็ตสถานะเมื่อขึ้นข้อใหม่
-    if(!reveal){
-      answered = false;
-      answeredChoice = null;
-    }
-
-    // ถ้าผู้เล่นตอบไปแล้ว และยังไม่เฉลย
-    if(answered && !reveal){
+    // 🛑 ถ้าผู้เล่นคนนี้ตอบไปแล้ว → ซ่อนปุ่มจนกว่าจะข้อถัดไป
+    if(answeredPlayers[playerId]){
       choices.innerHTML = "<p class='muted'>ส่งคำตอบแล้ว ⏳</p>";
       return;
     }
 
+    // ⛔ หมดเวลา
+    if(timer <= 0 && !reveal){
+      choices.innerHTML = "<p class='muted'>หมดเวลา ⌛</p>";
+      return;
+    }
+
+    // แสดงตัวเลือก
     q.choices.forEach((c,i)=>{
       const btn = document.createElement("button");
-      btn.innerText = c;
       btn.className = "choice";
-
-      if(reveal){
-        btn.disabled = true;
-        if(i === q.answer) btn.classList.add("correct");
-        else if(i === answeredChoice) btn.classList.add("wrong");
-      } else {
-        btn.onclick = ()=>submitAnswer(i, btn);
-        if(currentTimer <= 0) btn.disabled = true;
-      }
-
+      btn.innerText = c;
+      btn.onclick = () => submitAnswer(i);
       choices.appendChild(btn);
     });
   });
 }
 
 // ================= Submit Answer =================
-function submitAnswer(choice, btn){
-  if(answered || currentTimer <= 0) return;
+function submitAnswer(choice){
+  // บันทึกว่าคนนี้ตอบแล้ว (ล็อกถาวร)
+  db.ref(room+"/answeredPlayers/"+playerId).set(true);
 
-  answered = true;
-  answeredChoice = choice;
-
-  // 🎯 Animation ยุบ
-  btn.style.transform = "scale(0.9)";
-  setTimeout(()=>btn.style.transform="scale(1)",120);
-
-  // ❌ ลบตัวเลือกทั้งหมดหลัง animation
-  setTimeout(()=>{
-    choices.innerHTML = "<p class='muted'>ส่งคำตอบแล้ว ⏳</p>";
-  },150);
-
-  const correct = questions[currentQIndex].answer;
-  if(choice === correct){
-    db.ref(room+"/players/"+playerId+"/score")
-      .transaction(s => (s || 0) + currentTimer);
-  }
+  // ให้คะแนนถ้าถูก
+  db.ref(room).once("value").then(snap=>{
+    const data = snap.val();
+    const q = questions[data.qIndex];
+    if(choice === q.answer){
+      db.ref(room+"/players/"+playerId+"/score")
+        .transaction(s => (s||0) + data.timer);
+    }
+  });
 }
 
-// ================= Host Timer =================
+// ================= Host Controls =================
 function nextQuestion(){
   db.ref(room+"/qIndex").transaction(i=>(i??-1)+1);
   db.ref(room+"/timer").set(10);
   db.ref(room+"/reveal").set(false);
+  db.ref(room+"/answeredPlayers").set({});
 }
 
+// Timer (Host only)
 setInterval(()=>{
   if(!isHost || !room) return;
-
   db.ref(room+"/timer").transaction(t=>{
     if(t > 0) return t - 1;
     if(t === 0) db.ref(room+"/reveal").set(true);
@@ -237,7 +220,6 @@ db.ref().on("value", snap=>{
   if(!room) return;
   const players = snap.child(room+"/players").val()||{};
   scores.innerHTML="";
-
   Object.values(players)
     .sort((a,b)=>b.score-a.score)
     .forEach(p=>{
