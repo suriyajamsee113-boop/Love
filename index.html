@@ -10,8 +10,20 @@
 <style>
 body { font-family:sans-serif; background:#f3f4f6; text-align:center; }
 .card { background:#fff; padding:20px; margin:20px auto; border-radius:14px; max-width:420px; }
-button { width:100%; padding:14px; margin:6px 0; font-size:18px; border:none; border-radius:10px; background:#4f46e5; color:white; }
-button:disabled { background:#9ca3af; }
+button {
+  width:100%;
+  padding:14px;
+  margin:6px 0;
+  font-size:18px;
+  border:none;
+  border-radius:10px;
+  background:#4f46e5;
+  color:white;
+  transition: transform 0.1s ease, background 0.2s ease;
+}
+button:active { transform: scale(0.94); }
+button:disabled { background:#9ca3af; transform:none; }
+
 input { width:100%; padding:12px; font-size:16px; }
 
 .choice { background:#6366f1; }
@@ -73,47 +85,47 @@ let room = "";
 let playerId = Math.random().toString(36).substr(2,9);
 let isHost = false;
 let answered = false;
+let answeredChoice = null;
 let currentTimer = 0;
 let currentQIndex = -1;
 
-// ================= Create Room =================
+// ================= Create / Join =================
 function createRoom(){
   room = Math.floor(100000 + Math.random()*900000).toString();
   isHost = true;
 
-  document.getElementById("home").style.display="none";
-  document.getElementById("host").style.display="block";
-  document.getElementById("game").style.display="block";
-  document.getElementById("roomPin").innerText = room;
+  home.style.display="none";
+  host.style.display="block";
+  game.style.display="block";
+  roomPin.innerText = room;
 
   resetDB();
   listenRoom();
 }
 
-// ================= Join Room =================
 function joinRoom(){
   room = pinInput.value.trim();
   const name = nameInput.value.trim();
   if(!room || !name) return alert("กรอก PIN และชื่อ");
 
-  db.ref(room + "/players/" + playerId).set({
+  db.ref(room+"/players/"+playerId).set({
     name:name,
     score:0
   });
 
-  document.getElementById("home").style.display="none";
-  document.getElementById("game").style.display="block";
+  home.style.display="none";
+  game.style.display="block";
 
   listenRoom();
 }
 
-// ================= Reset Game =================
+// ================= Reset =================
 function resetDB(){
   db.ref(room).set({
-    qIndex: -1,
-    timer: 0,
-    reveal: false,
-    players: {}
+    qIndex:-1,
+    timer:0,
+    reveal:false,
+    players:{}
   });
 }
 
@@ -133,12 +145,10 @@ function listenRoom(){
     currentQIndex = data.qIndex;
     const reveal = data.reveal;
 
-    document.getElementById("timer").innerText =
-      currentTimer > 0 ? "⏱ " + currentTimer : "";
+    timer.innerText = currentTimer > 0 ? "⏱ "+currentTimer : "";
 
     const q = questions[currentQIndex];
-    const div = document.getElementById("choices");
-    div.innerHTML = "";
+    choices.innerHTML = "";
 
     if(!q){
       question.innerText = "รอ Host เริ่มเกม";
@@ -147,6 +157,7 @@ function listenRoom(){
 
     question.innerText = q.text;
     answered = false;
+    answeredChoice = null;
 
     q.choices.forEach((c,i)=>{
       const btn = document.createElement("button");
@@ -156,47 +167,51 @@ function listenRoom(){
       if(reveal){
         btn.disabled = true;
         if(i === q.answer) btn.classList.add("correct");
-        else if(answeredChoice === i) btn.classList.add("wrong");
+        else if(i === answeredChoice) btn.classList.add("wrong");
       } else {
-        btn.onclick = () => submitAnswer(i);
+        btn.onclick = ()=>submitAnswer(i, btn);
         if(currentTimer <= 0) btn.disabled = true;
       }
 
-      div.appendChild(btn);
+      choices.appendChild(btn);
     });
   });
 }
 
-let answeredChoice = null;
-
 // ================= Submit Answer =================
-function submitAnswer(choice){
+function submitAnswer(choice, btn){
   if(answered || currentTimer <= 0) return;
+
   answered = true;
   answeredChoice = choice;
 
-  const correct = questions[currentQIndex].answer;
+  // 🔒 ปิดทุกปุ่มทันที
+  document.querySelectorAll(".choice").forEach(b=>b.disabled=true);
 
+  // 🎯 Animation ยุบ + feedback
+  btn.style.transform = "scale(0.9)";
+  setTimeout(()=>btn.style.transform="scale(1)",100);
+
+  const correct = questions[currentQIndex].answer;
   if(choice === correct){
-    db.ref(room + "/players/" + playerId + "/score")
-      .transaction(s => (s || 0) + currentTimer);
+    db.ref(room+"/players/"+playerId+"/score")
+      .transaction(s=>(s||0)+currentTimer);
   }
 }
 
-// ================= Host Controls =================
+// ================= Host Timer =================
 function nextQuestion(){
-  db.ref(room + "/qIndex").transaction(i => (i ?? -1) + 1);
-  db.ref(room + "/timer").set(10);
-  db.ref(room + "/reveal").set(false);
+  db.ref(room+"/qIndex").transaction(i=>(i??-1)+1);
+  db.ref(room+"/timer").set(10);
+  db.ref(room+"/reveal").set(false);
 }
 
-// Timer
 setInterval(()=>{
   if(!isHost || !room) return;
 
-  db.ref(room + "/timer").transaction(t=>{
-    if(t > 0) return t - 1;
-    if(t === 0) db.ref(room + "/reveal").set(true);
+  db.ref(room+"/timer").transaction(t=>{
+    if(t>0) return t-1;
+    if(t===0) db.ref(room+"/reveal").set(true);
     return t;
   });
 },1000);
@@ -204,14 +219,13 @@ setInterval(()=>{
 // ================= Leaderboard =================
 db.ref().on("value", snap=>{
   if(!room) return;
-  const players = snap.child(room + "/players").val() || {};
-  scores.innerHTML = "";
-
+  const players = snap.child(room+"/players").val()||{};
+  scores.innerHTML="";
   Object.values(players)
     .sort((a,b)=>b.score-a.score)
     .forEach(p=>{
-      const li = document.createElement("li");
-      li.innerText = `${p.name}: ${p.score}`;
+      const li=document.createElement("li");
+      li.innerText=`${p.name}: ${p.score}`;
       scores.appendChild(li);
     });
 });
